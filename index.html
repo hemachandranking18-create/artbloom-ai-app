@@ -3,20 +3,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtBloom AI</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f7f1ff;color:#30234b;padding:18px}
-header{background:linear-gradient(135deg,#a78bfa,#ffb5c5,#ffc58b);padding:24px;border-radius:24px;color:#30234b}
-h1{margin:0;font-size:30px}
-header p{margin-bottom:0}
-.card{background:white;padding:18px;margin-top:16px;border-radius:20px;box-shadow:0 5px 18px #30234b12}
-h2{margin-top:0;font-size:20px}
-button,.upload{display:inline-block;border:0;border-radius:13px;background:#7653ce;color:white;padding:12px 16px;font-size:15px;margin:5px 3px;cursor:pointer}
-input[type=file]{max-width:100%;margin:10px 0}
-input[type=range]{width:100%;accent-color:#7653ce}
-canvas{width:100%;height:auto;border-radius:12px;background:#fff;display:block;margin-top:12px}
+body{margin:0;padding:16px;background:#f6f0ff;color:#30234b;font:15px Arial,sans-serif}
+header{padding:22px;border-radius:22px;background:linear-gradient(135deg,#c7b5ff,#ffc2d2,#ffd0a0)}
+h1{margin:0;font-size:28px}
+.card{background:white;border-radius:18px;padding:16px;margin-top:14px;box-shadow:0 4px 15px #30234b12}
+button,select{border:0;border-radius:11px;padding:12px;margin:4px 2px;background:#7653ce;color:white;font-size:14px}
+.secondary{background:#e9e1fa;color:#49376f}
+input[type=file],input[type=range]{width:100%;margin:10px 0}
+input[type=range]{accent-color:#7653ce}
+canvas{display:block;width:100%;height:auto;border:1px solid #ddd;border-radius:10px;touch-action:none}
+.info{background:#f0eaff;border-radius:12px;padding:12px;margin-top:10px;line-height:1.7;overflow-wrap:anywhere}
 small{color:#75678d}
 </style>
 </head>
@@ -24,76 +24,296 @@ small{color:#75678d}
 <header>
 <h1>🌸 ArtBloom AI</h1>
 <p>Draw Better, Dream Bigger.</p>
-<p>Your little studio for learning to draw ✏️</p>
+<p>Your creative drawing studio ✏️</p>
 </header>
+
 <section class="card">
-<h2>🖼️ 1. Choose your photo</h2>
+<h2>🖼️ Reference Photo</h2>
 <input id="photo" type="file" accept="image/*">
-<div><button onclick="makeSketch()">Create Sketch</button>
-<button onclick="saveImage()">Save Drawing</button></div>
-<small>Choose a picture from your phone to make a sketch guide.</small>
+<button onclick="makeSketch()">Create Sketch</button>
+<button class="secondary" onclick="showOriginal()">Original Photo</button>
+<label>Sketch strength: <span id="strengthValue">1.5</span></label>
+<input id="strength" type="range" min="0.5" max="3" step="0.1" value="1.5">
 </section>
+
 <section class="card">
-<h2>🎨 2. Sketch Studio</h2>
-<label>Sketch strength <span id="amount">1.5</span></label>
-<input id="strength" type="range" min="0.5" max="3" step="0.1" value="1.5" oninput="amount.textContent=this.value">
-<canvas id="art" width="800" height="1000"></canvas>
+<h2>📐 Movable Drawing Grid</h2>
+<label>Paper orientation</label>
+<select id="orientation" onchange="resizeGrid()">
+<option value="portrait">A4 Portrait (210 × 297 mm)</option>
+<option value="landscape">A4 Landscape (297 × 210 mm)</option>
+</select>
+<label>Grid divisions</label>
+<select id="divisions" onchange="resetGrid()">
+<option value="2">2 × 2</option>
+<option value="3">3 × 3</option>
+<option value="4" selected>4 × 4</option>
+<option value="5">5 × 5</option>
+<option value="6">6 × 6</option>
+<option value="8">8 × 8</option>
+</select>
+<p><small>Drag a pink line with your finger to move it. Measurements update automatically.</small></p>
+<canvas id="art" width="700" height="990"></canvas>
+<div id="measurements" class="info">Upload a photo or move the grid over the blank canvas.</div>
+<button onclick="resetGrid()">Reset Grid</button>
+<button class="secondary" onclick="toggleGrid()" id="gridButton">Hide Grid</button>
+<button onclick="saveImage()">Save PNG</button>
 </section>
+
 <section class="card">
-<h2>📐 3. Drawing Grid</h2>
-<label><input type="checkbox" id="grid" onchange="draw()"> Show 4 × 4 grid</label>
-<p><small>Use the squares to help copy the picture onto paper.</small></p>
+<h2>✏️ Drawing Tips</h2>
+<p>1. Match the shapes in each square.</p>
+<p>2. Use the row and column measurements.</p>
+<p>3. Sketch lightly, then add details and shadows.</p>
 </section>
-<section class="card">
-<h2>🌱 Learn one step at a time</h2>
-<p>1. Look at the big shapes.</p>
-<p>2. Draw them lightly.</p>
-<p>3. Add smaller details.</p>
-<p>4. Finish with shadows and your own style!</p>
-</section>
+
 <script>
+const canvas=document.getElementById('art');
+const ctx=canvas.getContext('2d');
 const photo=document.getElementById('photo');
-const art=document.getElementById('art');
-const ctx=art.getContext('2d');
-let original=null;
-photo.onchange=()=>{
- const f=photo.files[0];if(!f)return;
- const img=new Image();
- img.onload=()=>{original=img;makeSketch()};
- img.src=URL.createObjectURL(f);
-};
-function makeSketch(){
- if(!original){alert('Please choose a photo first.');return;}
- const w=art.width,h=art.height;
- ctx.clearRect(0,0,w,h);ctx.fillStyle='white';ctx.fillRect(0,0,w,h);
- const scale=Math.min(w/original.width,h/original.height);
- const iw=original.width*scale,ih=original.height*scale;
- ctx.filter='grayscale(1) contrast(1.3)';
- ctx.drawImage(original,(w-iw)/2,(h-ih)/2,iw,ih);
- ctx.filter='none';
- const image=ctx.getImageData(0,0,w,h),d=image.data;
- const strength=Number(document.getElementById('strength').value);
- for(let i=0;i<d.length;i+=4){
-  const v=d[i];
-  const edge=Math.max(0,255-v);
-  const pencil=Math.max(0,255-edge*strength);
-  d[i]=d[i+1]=d[i+2]=pencil;d[i+3]=255;
- }
- ctx.putImageData(image,0,0);drawGrid();
+const strength=document.getElementById('strength');
+const orientation=document.getElementById('orientation');
+const divisions=document.getElementById('divisions');
+const measurements=document.getElementById('measurements');
+
+let original=null,shown=null,gridVisible=true;
+let xs=[],ys=[],drag=null;
+
+function paper(){
+ return orientation.value==='portrait'
+ ? {w:210,h:297}
+ : {w:297,h:210};
 }
-function drawGrid(){
- if(!document.getElementById('grid').checked)return;
- ctx.save();ctx.strokeStyle='#e34d87';ctx.lineWidth=2;
- for(let i=1;i<4;i++){
-  ctx.beginPath();ctx.moveTo(art.width*i/4,0);ctx.lineTo(art.width*i/4,art.height);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,art.height*i/4);ctx.lineTo(art.width,art.height*i/4);ctx.stroke();
+
+function resizeGrid(){
+ const d=paper();
+ canvas.width=700;
+ canvas.height=Math.round(700*d.h/d.w);
+ resetGrid();
+}
+
+function resetGrid(){
+ const n=Number(divisions.value);
+ xs=Array.from({length:n-1},(_,i)=>canvas.width*(i+1)/n);
+ ys=Array.from({length:n-1},(_,i)=>canvas.height*(i+1)/n);
+ render();
+}
+
+function render(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle='white';
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ if(shown){
+  const scale=Math.min(canvas.width/shown.width,canvas.height/shown.height);
+  const w=shown.width*scale,h=shown.height*scale;
+  ctx.drawImage(shown,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
  }
+
+ if(gridVisible)drawGrid();
+ updateMeasurements();
+}
+
+function drawGrid(){
+ ctx.save();
+ ctx.strokeStyle='#e64284';
+ ctx.lineWidth=2;
+ ctx.font='bold 15px Arial';
+ ctx.fillStyle='#a91e60';
+
+ xs.forEach((x,i)=>{
+  ctx.beginPath();
+  ctx.moveTo(x,0);
+  ctx.lineTo(x,canvas.height);
+  ctx.stroke();
+  ctx.fillText('V'+(i+1),Math.min(x+4,canvas.width-35),18);
+ });
+
+ ys.forEach((y,i)=>{
+  ctx.beginPath();
+  ctx.moveTo(0,y);
+  ctx.lineTo(canvas.width,y);
+  ctx.stroke();
+  ctx.fillText('H'+(i+1),5,Math.max(17,y-5));
+ });
  ctx.restore();
 }
-function draw(){if(original)makeSketch();else{ctx.clearRect(0,0,art.width,art.height);drawGrid()}}
-function saveImage(){
- const a=document.createElement('a');a.download='artbloom-sketch.png';a.href=art.toDataURL('image/png');a.click();
+
+function updateMeasurements(){
+ const d=paper(),sx=d.w/canvas.width,sy=d.h/canvas.height;
+ let out='<b>A4 paper: '+d.w+' × '+d.h+' mm</b><br>';
+ out+='<b>Vertical lines</b><br>';
+
+ xs.forEach((x,i)=>{
+  out+='V'+(i+1)+': '+(x*sx).toFixed(1)+' mm from left<br>';
+ });
+
+ out+='<b>Horizontal lines</b><br>';
+ ys.forEach((y,i)=>{
+  out+='H'+(i+1)+': '+(y*sy).toFixed(1)+' mm from top<br>';
+ });
+
+ out+='<b>Grid squares</b><br>';
+ const widths=[0,...xs,canvas.width];
+ const heights=[0,...ys,canvas.height];
+
+ for(let r=0;r<heights.length-1;r++){
+  for(let c=0;c<widths.length-1;c++){
+   out+='Row '+(r+1)+', column '+(c+1)+': ';
+   out+=((widths[c+1]-widths[c])*sx).toFixed(1);
+   out+=' × '+((heights[r+1]-heights[r])*sy).toFixed(1)+' mm<br>';
+  }
+ }
+ out+='<small>Measurements represent positions on the A4 guide. Print scaling may vary.</small>';
+ measurements.innerHTML=out;
 }
+
+photo.addEventListener('change',()=>{
+ const file=photo.files[0];
+ if(!file)return;
+ const url=URL.createObjectURL(file);
+ const img=new Image();
+ img.onload=()=>{
+  original=img;
+  shown=img;
+  render();
+  URL.revokeObjectURL(url);
+ };
+ img.onerror=()=>alert('Could not open that photo. Please choose another image.');
+ img.src=url;
+});
+
+strength.addEventListener('input',()=>{
+ document.getElementById('strengthValue').textContent=strength.value;
+ if(shown&&original&&shown!==original)makeSketch();
+});
+
+function makeSketch(){
+ if(!original){
+  alert('Please choose a photo first.');
+  return;
+ }
+
+ const temp=document.createElement('canvas');
+ temp.width=canvas.width;
+ temp.height=canvas.height;
+ const t=temp.getContext('2d');
+ t.fillStyle='white';
+ t.fillRect(0,0,temp.width,temp.height);
+
+ const scale=Math.min(temp.width/original.width,temp.height/original.height);
+ const w=original.width*scale,h=original.height*scale;
+ t.drawImage(original,(temp.width-w)/2,(temp.height-h)/2,w,h);
+
+ const im=t.getImageData(0,0,temp.width,temp.height);
+ const data=im.data;
+ const amount=Number(strength.value);
+
+ for(let i=0;i<data.length;i+=4){
+  const v=(data[i]+data[i+1]+data[i+2])/3;
+  const gray=Math.max(0,Math.min(255,255-(255-v)*amount));
+  data[i]=gray;
+  data[i+1]=gray;
+  data[i+2]=gray;
+ }
+ t.putImageData(im,0,0);
+
+ const result=new Image();
+ result.onload=()=>{shown=result;render()};
+ result.src=temp.toDataURL('image/png');
+}
+
+function showOriginal(){
+ if(!original){
+  alert('Please upload a photo first.');
+  return;
+ }
+ shown=original;
+ render();
+}
+
+function toggleGrid(){
+ gridVisible=!gridVisible;
+ document.getElementById('gridButton').textContent=
+  gridVisible?'Hide Grid':'Show Grid';
+ render();
+}
+
+function pointerPosition(e){
+ const rect=canvas.getBoundingClientRect();
+ return {
+  x:(e.clientX-rect.left)*canvas.width/rect.width,
+  y:(e.clientY-rect.top)*canvas.height/rect.height
+ };
+}
+
+canvas.addEventListener('pointerdown',e=>{
+ if(!gridVisible)return;
+ const p=pointerPosition(e);
+ let best=null,dist=Infinity;
+
+ xs.forEach((x,i)=>{
+  const d=Math.abs(p.x-x);
+  if(d<dist&&d<24){dist=d;best={axis:'x',i};}
+ });
+ ys.forEach((y,i)=>{
+  const d=Math.abs(p.y-y);
+  if(d<dist&&d<24){dist=d;best={axis:'y',i};}
+ });
+
+ if(best){
+  drag=best;
+  canvas.setPointerCapture(e.pointerId);
+  e.preventDefault();
+ }
+});
+
+canvas.addEventListener('pointermove',e=>{
+ if(!drag)return;
+ const p=pointerPosition(e);
+ if(drag.axis==='x'){
+  xs[drag.i]=Math.max(0,Math.min(canvas.width,p.x));
+ }else{
+  ys[drag.i]=Math.max(0,Math.min(canvas.height,p.y));
+ }
+ render();
+});
+
+function stopDrag(){drag=null}
+canvas.addEventListener('pointerup',stopDrag);
+canvas.addEventListener('pointercancel',stopDrag);
+
+function saveImage(){
+ const temp=document.createElement('canvas');
+ temp.width=canvas.width;
+ temp.height=canvas.height;
+ const t=temp.getContext('2d');
+ t.fillStyle='white';
+ t.fillRect(0,0,temp.width,temp.height);
+
+ if(shown){
+  const scale=Math.min(temp.width/shown.width,temp.height/shown.height);
+  const w=shown.width*scale,h=shown.height*scale;
+  t.drawImage(shown,(temp.width-w)/2,(temp.height-h)/2,w,h);
+ }
+ if(gridVisible){
+  t.strokeStyle='#e64284';
+  t.lineWidth=2;
+  xs.forEach(x=>{
+   t.beginPath();t.moveTo(x,0);t.lineTo(x,temp.height);t.stroke();
+  });
+  ys.forEach(y=>{
+   t.beginPath();t.moveTo(0,y);t.lineTo(temp.width,y);t.stroke();
+  });
+ }
+ const a=document.createElement('a');
+ a.download='artbloom-drawing-grid.png';
+ a.href=temp.toDataURL('image/png');
+ a.click();
+}
+
+resetGrid();
 </script>
 </body>
 </html>
+
