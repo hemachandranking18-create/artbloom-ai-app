@@ -1,0 +1,99 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArtBloom AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f7f1ff;color:#30234b;padding:18px}
+header{background:linear-gradient(135deg,#a78bfa,#ffb5c5,#ffc58b);padding:24px;border-radius:24px;color:#30234b}
+h1{margin:0;font-size:30px}
+header p{margin-bottom:0}
+.card{background:white;padding:18px;margin-top:16px;border-radius:20px;box-shadow:0 5px 18px #30234b12}
+h2{margin-top:0;font-size:20px}
+button,.upload{display:inline-block;border:0;border-radius:13px;background:#7653ce;color:white;padding:12px 16px;font-size:15px;margin:5px 3px;cursor:pointer}
+input[type=file]{max-width:100%;margin:10px 0}
+input[type=range]{width:100%;accent-color:#7653ce}
+canvas{width:100%;height:auto;border-radius:12px;background:#fff;display:block;margin-top:12px}
+small{color:#75678d}
+</style>
+</head>
+<body>
+<header>
+<h1>🌸 ArtBloom AI</h1>
+<p>Draw Better, Dream Bigger.</p>
+<p>Your little studio for learning to draw ✏️</p>
+</header>
+<section class="card">
+<h2>🖼️ 1. Choose your photo</h2>
+<input id="photo" type="file" accept="image/*">
+<div><button onclick="makeSketch()">Create Sketch</button>
+<button onclick="saveImage()">Save Drawing</button></div>
+<small>Choose a picture from your phone to make a sketch guide.</small>
+</section>
+<section class="card">
+<h2>🎨 2. Sketch Studio</h2>
+<label>Sketch strength <span id="amount">1.5</span></label>
+<input id="strength" type="range" min="0.5" max="3" step="0.1" value="1.5" oninput="amount.textContent=this.value">
+<canvas id="art" width="800" height="1000"></canvas>
+</section>
+<section class="card">
+<h2>📐 3. Drawing Grid</h2>
+<label><input type="checkbox" id="grid" onchange="draw()"> Show 4 × 4 grid</label>
+<p><small>Use the squares to help copy the picture onto paper.</small></p>
+</section>
+<section class="card">
+<h2>🌱 Learn one step at a time</h2>
+<p>1. Look at the big shapes.</p>
+<p>2. Draw them lightly.</p>
+<p>3. Add smaller details.</p>
+<p>4. Finish with shadows and your own style!</p>
+</section>
+<script>
+const photo=document.getElementById('photo');
+const art=document.getElementById('art');
+const ctx=art.getContext('2d');
+let original=null;
+photo.onchange=()=>{
+ const f=photo.files[0];if(!f)return;
+ const img=new Image();
+ img.onload=()=>{original=img;makeSketch()};
+ img.src=URL.createObjectURL(f);
+};
+function makeSketch(){
+ if(!original){alert('Please choose a photo first.');return;}
+ const w=art.width,h=art.height;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle='white';ctx.fillRect(0,0,w,h);
+ const scale=Math.min(w/original.width,h/original.height);
+ const iw=original.width*scale,ih=original.height*scale;
+ ctx.filter='grayscale(1) contrast(1.3)';
+ ctx.drawImage(original,(w-iw)/2,(h-ih)/2,iw,ih);
+ ctx.filter='none';
+ const image=ctx.getImageData(0,0,w,h),d=image.data;
+ const strength=Number(document.getElementById('strength').value);
+ for(let i=0;i<d.length;i+=4){
+  const v=d[i];
+  const edge=Math.max(0,255-v);
+  const pencil=Math.max(0,255-edge*strength);
+  d[i]=d[i+1]=d[i+2]=pencil;d[i+3]=255;
+ }
+ ctx.putImageData(image,0,0);drawGrid();
+}
+function drawGrid(){
+ if(!document.getElementById('grid').checked)return;
+ ctx.save();ctx.strokeStyle='#e34d87';ctx.lineWidth=2;
+ for(let i=1;i<4;i++){
+  ctx.beginPath();ctx.moveTo(art.width*i/4,0);ctx.lineTo(art.width*i/4,art.height);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,art.height*i/4);ctx.lineTo(art.width,art.height*i/4);ctx.stroke();
+ }
+ ctx.restore();
+}
+function draw(){if(original)makeSketch();else{ctx.clearRect(0,0,art.width,art.height);drawGrid()}}
+function saveImage(){
+ const a=document.createElement('a');a.download='artbloom-sketch.png';a.href=art.toDataURL('image/png');a.click();
+}
+</script>
+</body>
+</html>
